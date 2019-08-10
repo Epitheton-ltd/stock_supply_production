@@ -98,7 +98,7 @@ class Production(metaclass=PoolMeta):
                 for p in sub_products)
 
             for warehouse in warehouses:
-                quantities = defaultdict(lambda: 0,
+                quantities = defaultdict(int,
                     ((x, pbl.pop((warehouse.id, x), 0)) for x in product_ids))
                 # Do not compute shortage for product
                 # with different order point
@@ -133,6 +133,8 @@ class Production(metaclass=PoolMeta):
             date = today
         else:
             date -= datetime.timedelta(1)
+        uom = product.default_uom
+        quantity = uom.ceil(quantity)
         return cls(
             planned_date=date,
             company=company,
@@ -140,7 +142,7 @@ class Production(metaclass=PoolMeta):
             location=warehouse.production_location,
             product=product,
             bom=product.boms[0].bom if product.boms else None,
-            uom=product.default_uom,
+            uom=uom,
             quantity=quantity,
             state='request',
             )
@@ -195,7 +197,11 @@ class Production(metaclass=PoolMeta):
             while (products_period
                     and products_period[0][0] <= (current_date - date)):
                 _, product = products_period.pop(0)
-                product_ids.remove(product.id)
+                try:
+                    product_ids.remove(product.id)
+                except ValueError:
+                    # product may have been already removed on get_shortages
+                    pass
             current_date += datetime.timedelta(1)
 
             # Update current quantities with next moves
